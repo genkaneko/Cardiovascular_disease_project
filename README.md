@@ -16,7 +16,7 @@ Main figure 6/
 
 Extended Data Figures
 Scripts used to generate the Extended Data figures are organized into:
-Extended figure 2/
+Extended figure 1/
 
 Shared analysis scripts
 The following scripts are used across multiple analyses:
