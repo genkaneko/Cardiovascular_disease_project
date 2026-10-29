@@ -21,26 +21,9 @@ Extended figure 1/
 Shared analysis scripts
 The following scripts are used across multiple analyses:
 Script
-Description
-AlphaIndex.R
-Alpha-diversity analysis
-BetaR2.R
-Beta-diversity (PERMANOVA/R²) analysis
-Causal Mediation Analysis.R
-Causal mediation analysis
-Cytokine correlation.R
-Correlation analysis with plasma cytokines
-SCFA correlation.R
-Correlation analysis with fecal short-chain fatty acids
 Enrich.R
-Functional enrichment analysis
-Life factors spearman.R
-Spearman correlation analysis among lifestyle factors
-MADE score.R
-Construction and validation of the MADE score
-MaAsLin2.R
-Cross-sectional association analysis using MaAsLin2
-
+MaAsLin2_gut.R
+MaAsLin2_oral.R
 
 Input files
 Typical input files include:
