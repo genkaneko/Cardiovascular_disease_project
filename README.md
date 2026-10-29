@@ -20,7 +20,6 @@ Extended figure 1/
 
 Shared analysis scripts
 The following scripts are used across multiple analyses:
-Script
 Enrich.R
 MaAsLin2_gut.R
 MaAsLin2_oral.R
