@@ -1,0 +1,95 @@
+library(tidyverse)
+library(ggpubr)
+library(svglite)
+
+maa=as.data.frame(read.csv("7cohort_motusp_MAA.csv"))
+maa=maa[maa$metadata=="AF",]
+
+plots <- list()
+tempfix=maa[maa$cate=="PSM",]
+tempfix = tempfix[, c(1,3,5,6)]
+tempmaa=maa[maa$cate=="5137",]
+tempmaa = tempmaa[, c(1,3,5,6)]
+
+colnames(tempfix) = c("name", "coef_AF", "pval_AF", "qval_AF")
+colnames(tempmaa) = c("name", "coef_Stroke", "pval_Stroke", "qval_Stroke")
+temp = merge(tempfix, tempmaa, by = "name")
+p <- ggplot(temp, aes(x = coef_AF, y = coef_Stroke)) +
+  geom_point(size = 0.1) + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue",linewidth = 0.5) +
+  stat_cor(method = "spearman", size = 3.5) +
+  labs(title = paste0( " ", nrow(temp), " motus MAA coef PSM vs 5137 Allcoef"),
+       x = "coef_PSM_AF", y = paste0("coef_5137_AF")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    panel.grid.minor = element_blank()  # remove minor grid lines
+  )
+
+plots[[1]] <- p
+
+tempfix=maa[maa$cate=="PSM",]
+tempfix = tempfix[, c(1,3,5,6)]
+tempmaa=maa[maa$cate=="AFvsHealth",]
+tempmaa = tempmaa[, c(1,3,5,6)]
+
+colnames(tempfix) = c("name", "coef_AF", "pval_AF", "qval_AF")
+colnames(tempmaa) = c("name", "coef_Stroke", "pval_Stroke", "qval_Stroke")
+temp = merge(tempfix, tempmaa, by = "name")
+p <- ggplot(temp, aes(x = coef_AF, y = coef_Stroke)) +
+  geom_point(size = 0.1) + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue",linewidth = 0.5) +
+  stat_cor(method = "spearman", size = 3.5) +
+  labs(title = paste0( " ", nrow(temp), " motus MAA coef PSM vs Health Allcoef"),
+       x = "coef_PSM_AF", y = paste0("coef_Health_AF")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    panel.grid.minor = element_blank()  # remove minor grid lines
+  )
+
+plots[[2]] <- p
+
+
+tempfix=maa[maa$cate=="AFvsHealth",]
+tempfix = tempfix[, c(1,3,5,6)]
+tempmaa=maa[maa$cate=="5137",]
+tempmaa = tempmaa[, c(1,3,5,6)]
+
+
+colnames(tempfix) = c("name", "coef_AF", "pval_AF", "qval_AF")
+colnames(tempmaa) = c("name", "coef_Stroke", "pval_Stroke", "qval_Stroke")
+temp = merge(tempfix, tempmaa, by = "name")
+p <- ggplot(temp, aes(x = coef_AF, y = coef_Stroke)) +
+  geom_point(size = 0.1) + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue",linewidth = 0.5) +
+  stat_cor(method = "spearman", size = 3.5) +
+  labs(title = paste0( " ", nrow(temp), " motus MAA coef 5137 vs Health Allcoef"),
+       x = "coef_Health_AF", y = paste0("coef_5137_AF")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    panel.grid.minor = element_blank()  # remove minor grid lines
+  )
+
+plots[[3]] <- p
+
+# Save as SVG
+for (i in 1:length(plots)) {
+  ggsave(paste0("plot_allcoef_", i, ".svg"), 
+         plot = plots[[i]],
+         width = 2, height = 2.2, 
+         units = "in")
+}
