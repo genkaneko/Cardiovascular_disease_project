@@ -238,6 +238,6 @@ print(g)
 dev.off()
 
 join_source_data <- join %>% dplyr::select(feature_name.x, coef.x, pval.x, qval.x, coef.y,pval.y, qval.y)
-colnames(join_source_data) <- c("Species", "Coef_Chinese", "Pval_Chinese", "FDR_Chinese",
-                                "Coef_Japanese", "Pval_Japanese", "FDR_Japanese")
+colnames(join_source_data) <- c("Species", "Coef_Japanese", "Pval_Japanese", "FDR_Japanese",
+                                "Coef_Chinese", "Pval_Chinese", "FDR_Chinese")
 write_csv(join_source_data, "Fig4F_Source_data.csv")
