@@ -1,3 +1,18 @@
+# Extended Data Fig. 1a
+#   Output: adonis_r2_barplot.svg
+#   Bar plot of the variance in gut microbiome composition explained (R2)
+#   by each of 10 host covariates. R2 values come from PERMANOVA (adonis2)
+#   on Bray-Curtis distances, run separately for each covariate.
+#
+# Input: beta_diversity_10factor_results.rds, created by Fig2.R.
+#        Run Fig2.R first.
+#
+# Covariate names are renamed for display
+# (e.g., "Age" -> "Age>=65", "newHTN" -> "Hypertension").
+#
+# Required packages: ggplot2, svglite (ggsave() uses it for SVG output)
+# Minor edition was made after export
+
 library(ggplot2)
 
 # Load beta diversity results
