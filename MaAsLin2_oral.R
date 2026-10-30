@@ -1,4 +1,3 @@
-setwd("/Users/gizen/Documents/AF/20250813")
 library(MatchIt)
 library(openxlsx)
 library(tableone)
@@ -9,10 +8,10 @@ library(tidyverse)
 library(reshape2)
 library(viridis)
 
-meta=as.data.frame(read.csv("../20250813/oral_AF_meta_nonpaf_newHTN.csv",row.names = 1))
+meta=as.data.frame(read.csv("oral_AF_meta_nonpaf_newHTN.csv",row.names = 1))
 rownames(meta)=meta$metas
-fdata=as.data.frame(t(read.xlsx("../saliva_240410.motus3.sp.relative_abundance.xlsx",rowNames = T,check.names = F,sep.names = " ")))
-new_old_name=as.data.frame(read.csv("/Users/gizen/Documents/smoking/motu3/菌.csv",row.names = 1))
+fdata=as.data.frame(t(read.xlsx("../saliva.motus3.sp.relative_abundance.xlsx",rowNames = T,check.names = F,sep.names = " ")))
+new_old_name=as.data.frame(read.csv("smoking_abundance.csv",row.names = 1))
 new_old_name=new_old_name[!is.na(new_old_name$old),]
 rownames(new_old_name)=new_old_name$old
 
@@ -24,8 +23,6 @@ diskey=c("AF",
          "PAD",
          "Stroke"
 )
-
-
 
 set.seed(123)
 meta_data <- meta  # ファイル名を適宜変更
