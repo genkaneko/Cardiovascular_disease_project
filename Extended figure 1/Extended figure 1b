@@ -17,7 +17,7 @@
 # (e.g., "Age" -> "Age>=65", "newHTN" -> "Hypertension").
 #
 # Required packages: ComplexHeatmap, circlize, tidyverse
-# Minor edition was made after export
+# Minor edits were made after export
 
 library(ComplexHeatmap)
 library(circlize)
