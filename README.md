@@ -55,48 +55,24 @@ Expected outputs
 The scripts generate statistical results and/or graphical outputs corresponding to the analyses described in the manuscript.
 Depending on the analysis, expected outputs include:
 alpha- and beta-diversity results
-cross-sectional association results
-causal mediation analysis results
-longitudinal analysis results
 correlation analysis results
 functional enrichment results
-LASSO-based MADE score construction and validation results
 main and Extended Data figure components
-Runtime depends on the analysis and the size of the input dataset. Analyses involving large metagenomic datasets or computationally intensive procedures, such as nested cross-validation, may require longer runtimes than standard statistical or plotting procedures.
-
-Demo data
-A participant-level demonstration dataset is not provided because individual-level metadata from the Japanese 4D cohort cannot be publicly released owing to ethical and privacy restrictions.
+Runtime depends on the analysis and the size of the input dataset. Analyses involving large metagenomic datasets or computationally intensive procedures may require longer runtimes than standard statistical or plotting procedures.
 
 Instructions for use
 To apply the scripts to other datasets, users should prepare input data with variables and data structures corresponding to those described in the Input files section and specify the appropriate local input paths in each R script.
 Users may need to modify file paths, variable names, or metadata column names to match their own datasets.
 The corresponding R scripts contain the detailed preprocessing, statistical analysis, and output-generation procedures used for each analysis.
 
-Analysis workflow
-Processed microbiome profiles + metadata
-↓
-Cross-sectional association analysis
-↓
-Longitudinal analysis
-↓
-Causal mediation analysis
-↓
-Functional enrichment analysis
-↓
-MADE score construction and validation
-↓
-Generation of figures
-
 Reproducibility
 Scripts corresponding to the analyses presented in the manuscript are organized by main and Extended Data figures. Common statistical procedures are also provided as independent shared scripts to improve transparency and reproducibility.
 The repository provides the analysis code used to generate the quantitative results and figures reported in the manuscript.
-Complete reproduction of analyses requiring individual-level Japanese 4D metadata is not possible from the public repository alone because these data cannot be publicly released under applicable ethical approvals and privacy regulations. Access to individual-level metadata is subject to the data-sharing procedures described in the Data availability section.
+Complete reproduction of analyses is not possible from the public repository alone because these data cannot be publicly released under applicable ethical approvals and privacy regulations. Access to individual-level metadata is subject to the data-sharing procedures described in the Data availability section.
 
 Data availability
-The human metagenomic sequencing data from the Japanese 4D cohort (n = 6,803) have been deposited in the NCBI Sequence Read Archive (SRA) under accession numbers PRJNA1169537 (n = 654), PRJNA832909 (n = 104), and PRJNA1445561 (n = 6,017), and will be publicly available upon publication.
+The human metagenomic sequencing data from the Japanese 4D cohort (n = 6,803) have been deposited in the NCBI Sequence Read Archive (SRA) under accession numbers PRJNA1169537 (n = 654)31, PRJNA832909 (n = 136)28, PRJNA1445561 (n = 4,343), and PRJNA1552338 (n = 4). The human oral shotgun metagenomic sequencing data (n = 889) have been deposited under accession number PRJNA832909 (n = 265)28, and PRJNA1552353 (n = 624), and will be publicly available upon publication.
 Metagenomic data from the external validation cohorts are publicly available from the respective original studies and can be accessed via the corresponding publications and associated repositories.
-Due to personal data protection laws and clinical research regulations in Japan, individual-level metadata from the Japanese 4D cohort are not publicly available. Data may be shared only through collaborative research upon mutual agreement and approval by both the institutional review board of our institution and that of the requesting institution, and only within the scope of the approved ethical permissions.
-Requests for collaborative research should be directed to the corresponding author.
 
 License
 This repository is distributed under the MIT License.
@@ -104,8 +80,8 @@ The license applies to the source code only. Access to human participant data re
 
 Citation
 If you use these scripts, please cite:
-Nagata N, et al.
-Opposing microbiome-mediated axes link modifiable lifestyles to health and chronic diseases
+Yazaki Y, et al.
+Large-Scale Cross-Disease Analysis Reveals Shared and Distinct Gut and Oral Microbiome Signatures Across Cardiovascular Diseases
 
 Contact
 Corresponding author
