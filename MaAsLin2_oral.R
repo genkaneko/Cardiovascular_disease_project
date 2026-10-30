@@ -10,7 +10,7 @@ library(viridis)
 
 meta=as.data.frame(read.csv("oral_AF_meta_nonpaf_newHTN.csv",row.names = 1))
 rownames(meta)=meta$metas
-fdata=as.data.frame(t(read.xlsx("../saliva.motus3.sp.relative_abundance.xlsx",rowNames = T,check.names = F,sep.names = " ")))
+fdata=as.data.frame(t(read.xlsx("saliva.motus3.sp.relative_abundance.xlsx",rowNames = T,check.names = F,sep.names = " ")))
 new_old_name=as.data.frame(read.csv("smoking_abundance.csv",row.names = 1))
 new_old_name=new_old_name[!is.na(new_old_name$old),]
 rownames(new_old_name)=new_old_name$old
