@@ -1,3 +1,24 @@
+# Extended Data Fig. 1b
+#   Output: motu_MAA_AF_5137PSMHealth_fdr01.pdf
+#   Heatmap of MaAsLin2 coefficients at the genus level for AF
+#   (three comparisons: AFvsHealth, PSM and 5137) and for 10 host covariates.
+#   Genera with FDR < 0.1 and |coef| > 0.25 in at least one column are shown.
+#   * FDR < 0.1, ** FDR < 0.05. Rows are hierarchically clustered.
+#   Top bar plot: R2 of each covariate from PERMANOVA (adonis2);
+#   set to 0 for the three AF comparisons.
+#
+# Inputs:
+#   7cohort_genus_MAA.csv           MaAsLin2 results for AF
+#                                   (column `cate` = comparison)
+#   7cohort_genus_singlefactor.csv  MaAsLin2 results for each covariate
+#   beta_diversity_10factor_results.rds, created by Fig2.R (run Fig2.R first)
+#
+# Covariate names are renamed for display
+# (e.g., "Age" -> "Age>=65", "newHTN" -> "Hypertension").
+#
+# Required packages: ComplexHeatmap, circlize, tidyverse
+# Minor edition was made after export
+
 library(ComplexHeatmap)
 library(circlize)
 library(tidyverse)
