@@ -3,7 +3,7 @@
 #   B: alpha_violin_richness.pdf  (Richness)
 #   C: beta_diversity_7cohort_mds_plots.pdf
 #      (PCoA of Bray-Curtis distances; P values from PERMANOVA, adonis2)
-# Panel titles, axis labels and P-value formatting were edited after export
+# Minor edits were made after export
 # (e.g., "CHF" is shown as "HF", groups 0/1 as Control/Case).
 #
 # This script also writes beta_diversity_10factor_results.rds,
