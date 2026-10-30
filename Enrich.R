@@ -1,12 +1,11 @@
-setwd("/Users/gizen/Documents/AF/20250810/")
-library(openxlsx)
 library(clusterProfiler)
-library(tidyr)
 library(tidyverse)
-mas_all_metadata=as.data.frame(read.csv("./7cohort_KO_MAA_20250810.csv"))
+
+mas_all_metadata=as.data.frame(read.csv("./7cohort_KO_MAA.csv"))
 mas_all_metadata=mas_all_metadata[mas_all_metadata$cate=="5137",]
 #https://rest.kegg.jp/link/ko/pathway
 #https://rest.kegg.jp/list/pathway/ko
+
 resultp=NULL
 resultfdr=NULL
 for (i in unique(mas_all_metadata$metadata)){
@@ -38,4 +37,4 @@ for (i in unique(mas_all_metadata$metadata)){
   
 }
 
-write.csv(resultp,"KEGGID_enrichfdr01_7cohort_250811.csv")
+write.csv(resultp,"KEGGID_enrichfdr01_7cohort.csv")
