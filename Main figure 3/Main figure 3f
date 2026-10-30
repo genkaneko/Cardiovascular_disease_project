@@ -1,0 +1,243 @@
+# Fig. 3f: IHD-associated gut species in this study (Japan) vs Jie et al. 2017 (China).
+#   Species with FDR < 0.1 for IHD in both cohorts (MaAsLin2, adjusted for age and sex) are shown;
+#   Spearman's rho and P are shown, and the line is a linear regression fit with 95% CI.
+# Input: Japan_MAA_2fix_minprev0025.csv, World_Jie2017_IHD_MAA_2fix_minprev0025.xlsx. Output: IHD_Jap4D_vs_Jie_AgeSex_scatterplot.pdf, Fig4F_Source_data.csv
+# Required packages: tidyverse, ggrepel, readxl. Minor edits were made after export.
+
+library(tidyverse)
+library(ggrepel)
+
+df_4d <- read.csv("Japan_MAA_2fix_minprev0025.csv")
+df_jie <- readxl::read_excel("World_Jie2017_IHD_MAA_2fix_minprev0025.xlsx",
+  sheet = 1,
+  col_names = TRUE,
+  col_types = NULL,
+  na = "",
+  skip = 0
+)
+
+# Select species
+df_4d_sig <- df_4d %>% dplyr::filter(qval<0.1 & outcome=="IHD" & fix=="Age+Sex")
+df_Jie_agesex <- df_jie %>% dplyr::filter(fix=="Age+Sex")
+
+df_Jie_agesex <- df_Jie_agesex %>% dplyr::filter(qval < 0.1)
+
+join <- inner_join(df_4d_sig, df_Jie_agesex, by = "id")
+join_coef <- join %>% dplyr::select(feature_name.x, coef.x, coef.y)
+colnames(join_coef) <- c("Feature", "coef_4D", "coef_Jie")
+
+
+# ---- Plot data -------------------------------------------------------------
+
+# Exclude NA/Inf values from the correlation and the plot
+join_coef_plot <- join_coef %>%
+  dplyr::filter(
+    is.finite(coef_4D),
+    is.finite(coef_Jie)
+  )
+
+# ---- Statistics for annotation ---------------------------------------------
+
+# Spearman rank correlation
+spearman_result <- cor.test(
+  join_coef_plot$coef_4D,
+  join_coef_plot$coef_Jie,
+  method = "spearman",
+  exact = FALSE
+)
+
+rho_value <- unname(spearman_result$estimate)
+p_value <- spearman_result$p.value
+
+# Show rho and P with 3 decimal places
+rho_label <- sprintf("rho = %.3f, P = %.3f", rho_value, p_value)
+
+# ---- Annotation text -------------------------------------------------------
+# Numbers of species with q < 0.1 (Japan) and of matched species are calculated from the data
+n_4d_q01 <- nrow(df_4d_sig)
+n_matched <- nrow(join_coef_plot)
+
+annotation_text <- paste(
+  rho_label,
+  sprintf("JP q<0.1=%d, Jie q<0.1=213, matched=%d", n_4d_q01, n_matched),
+  sep = "\n"
+)
+
+# ---- Axis limits ------------------------------------------------------------
+# Add margins so that points and the regression line are not cut off at the edges
+x_range <- range(join_coef_plot$coef_4D, na.rm = TRUE)
+y_range <- range(join_coef_plot$coef_Jie, na.rm = TRUE)
+
+x_pad <- diff(x_range) * 0.08
+y_pad <- diff(y_range) * 0.08
+
+# Fallback when the range is 0 (e.g., all values are identical)
+if (x_pad == 0) x_pad <- 0.05
+if (y_pad == 0) y_pad <- 0.05
+
+x_limits <- c(x_range[1] - x_pad, x_range[2] + x_pad)
+y_limits <- c(y_range[1] - y_pad, y_range[2] + y_pad)
+
+# ---- Select species to label -----------------------------------------------
+
+# Standardize both axes and use their sum to pick species at the two ends of the diagonal:
+# the 3 lowest (bottom left) and the 3 highest (top right)
+plot_with_score <- join_coef_plot %>%
+  mutate(
+    diagonal_score =
+      as.numeric(scale(coef_4D)) +
+      as.numeric(scale(coef_Jie))
+  )
+
+label_bottom_left <- plot_with_score %>%
+  arrange(diagonal_score) %>%
+  slice_head(n = 3)
+
+label_top_right <- plot_with_score %>%
+  arrange(desc(diagonal_score)) %>%
+  slice_head(n = 3)
+
+# Add species to be labelled explicitly
+label_extra <- join_coef_plot %>%
+  dplyr::filter(
+    Feature == "Incongruent [g__Lactobacillus] [ID:01039]" |
+    Feature == "Limosilactobacillus fermentum [ID:01407]"
+  )
+
+# 3 bottom-left + 3 top-right + specified species
+# distinct() keeps each species only once, even if it was selected twice
+species_to_label <- bind_rows(
+  label_bottom_left,
+  label_top_right,
+  label_extra
+) %>%
+  distinct(Feature, .keep_all = TRUE)
+
+# ---- Scatter plot ----------------------------------------------------------
+
+g <- ggplot(join_coef_plot, aes(x = coef_4D, y = coef_Jie)) +
+  geom_point(
+    shape = 16,
+    size = 2.4,
+    alpha = 0.65,
+    colour = "grey25"
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ x,
+    se = TRUE,
+    level = 0.95,
+    linewidth = 0.9,
+    colour = "blue",
+    fill = "grey70",
+    alpha = 0.45
+  ) +
+  ggrepel::geom_text_repel(
+    data = species_to_label,
+    aes(
+      x = coef_4D,
+      y = coef_Jie,
+      label = Feature
+    ),
+    inherit.aes = FALSE,
+    size = 4.0,
+    colour = "black",
+    family = "sans",
+    
+    # Lines connecting points and labels
+    segment.colour = "grey30",
+    segment.size = 0.35,
+    segment.alpha = 0.9,
+    min.segment.length = 0,
+    
+    # Padding around labels and points
+    box.padding = 0.35,
+    point.padding = 0.20,
+    
+    # Do not drop any of the selected labels
+    max.overlaps = Inf,
+    
+    # Make label positions reproducible
+    seed = 123,
+    max.time = 3,
+    max.iter = 20000
+  ) +
+  annotate(
+    geom = "text",
+    x = x_limits[1] + 0.025 * diff(x_limits),
+    y = y_limits[2] - 0.025 * diff(y_limits),
+    label = annotation_text,
+    hjust = 0,
+    vjust = 1,
+    size = 6,
+    colour = "black",
+    family = "sans",
+    lineheight = 1.15
+  ) +
+  labs(
+    title = "IHD vs IHD | Age+Sex",
+    x = "Jap4D coefficient",
+    y = "Jie coefficient"
+  ) +
+  coord_cartesian(
+    xlim = x_limits,
+    ylim = y_limits,
+    expand = FALSE,
+    clip = "off"
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 14,
+      margin = margin(b = 8)
+    ),
+    axis.title = element_text(
+      size = 16,
+      colour = "black"
+    ),
+    axis.text = element_text(
+      size = 14,
+      colour = "grey20"
+    ),
+    axis.line = element_line(
+      colour = "grey25",
+      linewidth = 0.8
+    ),
+    axis.ticks = element_line(
+      colour = "grey25",
+      linewidth = 0.8
+    ),
+    axis.ticks.length = unit(3, "pt"),
+    panel.grid.major = element_line(
+      colour = "grey88",
+      linewidth = 0.35
+    ),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(
+      t = 8,
+      r = 42,
+      b = 28,
+      l = 42,
+      unit = "pt"
+    )
+  )
+
+out_pdf <- "IHD_Jap4D_vs_Jie_AgeSex_scatterplot.pdf"
+print(g)
+pdf(
+  out_pdf,
+  width = 8,
+  height = 6,
+  useDingbats = FALSE
+)
+
+print(g)
+
+dev.off()
+
+join_source_data <- join %>% dplyr::select(feature_name.x, coef.x, pval.x, qval.x, coef.y,pval.y, qval.y)
+colnames(join_source_data) <- c("Species", "Coef_Chinese", "Pval_Chinese", "FDR_Chinese",
+                                "Coef_Japanese", "Pval_Japanese", "FDR_Japanese")
+write_csv(join_source_data, "Fig4F_Source_data.csv")
