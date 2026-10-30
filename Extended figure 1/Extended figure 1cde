@@ -1,3 +1,23 @@
+# Extended Data Fig. 1c-e
+#   Outputs: plot_allcoef_1.svg (c), plot_allcoef_2.svg (d), plot_allcoef_3.svg (e)
+#   Scatter plots comparing MaAsLin2 coefficients for AF at the species
+#   (mOTU) level between pairs of comparisons:
+#     c: PSM vs 5137
+#     d: PSM vs AFvsHealth
+#     e: AFvsHealth vs 5137
+#   Each point is a species found in both comparisons (no significance filter).
+#   Spearman's rho and P are shown (ggpubr::stat_cor);
+#   the blue line is a linear regression fit.
+#
+# Input:
+#   7cohort_motusp_MAA.csv  MaAsLin2 results for AF (column `cate` = comparison)
+#
+# Note: coef_AF / coef_Stroke are generic column names for the x- and y-axis
+#       comparisons, respectively; they do not refer to stroke.
+#
+# Required packages: tidyverse, ggpubr, svglite
+# Minor edits were made after export.
+
 library(tidyverse)
 library(ggpubr)
 library(svglite)
