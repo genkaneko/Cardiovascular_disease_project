@@ -11,7 +11,7 @@
 # (e.g., "Age" -> "Age>=65", "newHTN" -> "Hypertension").
 #
 # Required packages: ggplot2, svglite (ggsave() uses it for SVG output)
-# Minor edition was made after export
+# Minor edits were made after export
 
 library(ggplot2)
 
