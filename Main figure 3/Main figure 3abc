@@ -1,0 +1,82 @@
+# Fig. 3a-c: scatter plots of MaAsLin2 coefficients (gut species, cate = "5137") between diseases
+#   (a: IHD vs HF, b: AF vs IHD, c: AF vs HF; HF is "CHF" in the data). Each point is a species;
+#   Spearman's rho and P are shown, and the blue line is a linear regression fit.
+# Input: 7cohort_motusp_MAA.csv (from MaAsLin2_gut.R). Output: motu_maa_5137_AF_vs_6cohort_ALL_scatterplots.pdf
+# Required packages: tidyverse, ggpubr. Minor edits were made after export.
+
+library(tidyverse)
+library(ggpubr)
+
+maa=as.data.frame(read.csv("7cohort_motusp_MAA.csv"))
+maa=maa[maa$cate=="5137",]
+
+plots <- list()
+
+tempfix=maa[maa$metadata=="AF",]
+tempfix = tempfix[, c(1,3,5,6)]
+tempmaa=maa[maa$metadata=="IHD",]
+tempmaa = tempmaa[, c(1,3,5,6)]
+
+colnames(tempfix) = c("name", "coef_AF", "pval_AF", "qval_AF")
+colnames(tempmaa) = c("name", "coef_Stroke", "pval_Stroke", "qval_Stroke")
+temp = merge(tempfix, tempmaa, by = "name")
+# temp=temp[(temp$qval_AF<0.1)|(temp$qval_Stroke<0.1),]
+# temp=temp[(temp$pval_AF<0.05)|(temp$pval_Stroke<0.05),]
+p <- ggplot(temp, aes(x =coef_Stroke , y = coef_AF)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  stat_cor(method = "spearman", size = 5) +
+  labs(title = paste0( " ", nrow(temp), " motus MAA coef AF vs IHD ALL"),
+       x = "coef_IHD", y = paste0("coef_AF")) +
+  theme_minimal()
+
+plots[[2]] <- p
+
+
+tempfix=maa[maa$metadata=="AF",]
+tempfix = tempfix[, c(1,3,5,6)]
+tempmaa=maa[maa$metadata=="CHF",]
+tempmaa = tempmaa[, c(1,3,5,6)]
+
+colnames(tempfix) = c("name", "coef_AF", "pval_AF", "qval_AF")
+colnames(tempmaa) = c("name", "coef_Stroke", "pval_Stroke", "qval_Stroke")
+temp = merge(tempfix, tempmaa, by = "name")
+# temp=temp[(temp$qval_AF<0.1)|(temp$qval_Stroke<0.1),]
+# temp=temp[(temp$pval_AF<0.05)|(temp$pval_Stroke<0.05),]
+p <- ggplot(temp, aes(x =coef_Stroke , y = coef_AF)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  stat_cor(method = "spearman", size = 5) +
+  labs(title = paste0( " ", nrow(temp), " motus MAA coef AF vs CHF ALL"),
+       x = "coef_CHF", y = paste0("coef_AF")) +
+  theme_minimal()
+
+plots[[3]] <- p
+
+tempfix=maa[maa$metadata=="IHD",]
+tempfix = tempfix[, c(1,3,5,6)]
+tempmaa=maa[maa$metadata=="CHF",]
+tempmaa = tempmaa[, c(1,3,5,6)]
+
+colnames(tempfix) = c("name", "coef_AF", "pval_AF", "qval_AF")
+colnames(tempmaa) = c("name", "coef_Stroke", "pval_Stroke", "qval_Stroke")
+temp = merge(tempfix, tempmaa, by = "name")
+# temp=temp[(temp$qval_AF<0.1)|(temp$qval_Stroke<0.1),]
+# temp=temp[(temp$pval_AF<0.05)|(temp$pval_Stroke<0.05),]
+p <- ggplot(temp, aes(x =coef_Stroke , y = coef_AF)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  stat_cor(method = "spearman", size = 5) +
+  labs(title = paste0( " ", nrow(temp), " motus MAA coef HF vs IHD ALL"),
+       x = "coef_HF", y = paste0("coef_IHD")) +
+  theme_minimal()
+
+plots[[1]] <- p
+
+
+pdf("motu_maa_5137_AF_vs_6cohort_ALL_scatterplots.pdf", width = 6, height = 6)  # Page size can be adjusted as needed
+
+for (p in plots) {
+  print(p)   # print() is required; otherwise nothing is drawn
+}
+dev.off()
