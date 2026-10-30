@@ -1,4 +1,3 @@
-setwd("/Users/gizen/Documents/AF/20250810/")
 library(MatchIt)
 library(openxlsx)
 library(tableone)
@@ -10,8 +9,7 @@ library(reshape2)
 library(viridis)
 library(ggpubr)
 
-
-maa=as.data.frame(read.csv("7cohort_motusp_MAA_20250810.csv"))
+maa=as.data.frame(read.csv("7cohort_motusp_MAA.csv"))
 maa=maa[maa$cate=="5137",]
 plots <- list()
 tempfix=maa[maa$metadata=="AF",]
@@ -74,7 +72,6 @@ p <- ggplot(temp, aes(x =coef_Stroke , y = coef_AF)) +
   theme_minimal()
 
 plots[[3]] <- p
-
 
 tempfix=maa[maa$metadata=="AF",]
 tempfix = tempfix[, c(1,3,5,6)]
