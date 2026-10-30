@@ -1,9 +1,9 @@
 # Fig. 2
 #   A: alpha_violin_shannon.pdf   (Shannon index; AF, IHD, CHF)
 #   B: alpha_violin_richness.pdf  (Richness)
-#   C: beta_diversity_7cohort_20250809_mds_plots.pdf
+#   C: beta_diversity_7cohort_mds_plots.pdf
 #      (PCoA of Bray-Curtis distances; P values from PERMANOVA, adonis2)
-# Minor edition was made after export
+# Panel titles, axis labels and P-value formatting were edited after export
 # (e.g., "CHF" is shown as "HF", groups 0/1 as Control/Case).
 #
 # This script also writes beta_diversity_10factor_results.rds,
@@ -162,7 +162,7 @@ write.xlsx(alpha_list, file = "alpha_diversity_6cohort.xlsx")
 
 for (index_name in names(plot_lists_by_index)) {
   plots <- plot_lists_by_index[[index_name]]
-  pdf_file <- paste0("alpha_violin_", tolower(index_name), ".pdf")
+  pdf_file <- paste0("alpha_", tolower(index_name), ".pdf")
   
   combined_plot <- wrap_plots(plots, nrow = 1)
   
@@ -267,7 +267,7 @@ for (i in names(beta_results)) {
 }
 
 # Save as PDF
-cairo_pdf("beta_diversity_7cohort_20250809_mds_plots.pdf", width = 2.3, height = 2.1)
+cairo_pdf("beta_diversity_7cohort_mds_plots.pdf", width = 2.3, height = 2.1)
 for (plot in beta_plots) {
   print(plot)
 }
@@ -288,7 +288,7 @@ checkkey=  c("Age",
                   
 )
 
-# Read the saved Bray-Curtis distance matrix (as a matrix)
+# 4. Read the saved Bray-Curtis distance matrix (as a matrix)
 bc_matrix_read <- read.csv("5137_bc_distance.csv", row.names = 1, check.names = FALSE)
 bc_matrix_read <- as.matrix(bc_matrix_read)
 
@@ -363,8 +363,9 @@ for (i in names(beta_results)) {
 }
 
 # Save as PDF
-cairo_pdf("beta_diversity_20250809_mds_plots.pdf", width = 1.5, height = 1.5)
+cairo_pdf("beta_diversity_mds_plots.pdf", width = 1.5, height = 1.5)
 for (plot in beta_plots) {
   print(plot)
 }
 dev.off()
+
