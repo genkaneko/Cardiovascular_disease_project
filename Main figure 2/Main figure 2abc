@@ -1,3 +1,14 @@
+# Fig. 2
+#   A: alpha_violin_shannon.pdf   (Shannon index; AF, IHD, CHF)
+#   B: alpha_violin_richness.pdf  (Richness)
+#   C: beta_diversity_7cohort_20250809_mds_plots.pdf
+#      (PCoA of Bray-Curtis distances; P values from PERMANOVA, adonis2)
+# Minor edition was made after export
+# (e.g., "CHF" is shown as "HF", groups 0/1 as Control/Case).
+#
+# This script also writes beta_diversity_10factor_results.rds,
+# which is used by ED_Fig1_a.R and ED_Fig1_b.R. Run this script first.
+
 library(vegan)
 library(openxlsx)
 library(ggplot2)
@@ -277,7 +288,7 @@ checkkey=  c("Age",
                   
 )
 
-# 4. Read the saved Bray-Curtis distance matrix (as a matrix)
+# Read the saved Bray-Curtis distance matrix (as a matrix)
 bc_matrix_read <- read.csv("5137_bc_distance.csv", row.names = 1, check.names = FALSE)
 bc_matrix_read <- as.matrix(bc_matrix_read)
 
