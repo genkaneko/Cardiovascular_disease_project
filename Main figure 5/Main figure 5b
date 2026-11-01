@@ -1,0 +1,129 @@
+# Fig. 5b: KEGG pathway enrichment of disease-associated KOs (bubble plot).
+#   KOs associated with each disease (MaAsLin2, cate = "5137", FDR < 0.1) were tested for KEGG pathway enrichment
+#   separately for positively (KO_list = "Enrich" -> UP, red) and negatively associated KOs (Down, blue).
+#   Pathways with adjusted P (p.adjust) < 0.1 are shown for AF, Non-PAF, PAF, IHD and HF.
+#   Bubble size = gene ratio (capped at 5%). Tiles on the left and right show the KEGG subcategory (level B);
+#   pathway names (level C) are shown on the right.
+# Input: KEGGID_enrichfdr01_7cohort.csv (pathway enrichment results)
+# Output: 250811_7cohort_FDR005_bubble_plot.pdf
+# Required packages: tidyverse, patchwork, microViz (for distinct_palette(); install from
+#   https://david-barnett.r-universe.dev). Minor edits were made after export.
+
+library(tidyverse)
+library(microViz)
+library(patchwork)
+
+# Settings
+enrich_qvalue_thr=0.1  # threshold for the enrichment p.adjust
+max_l=0.05             # gene ratios above this value are capped
+times=1
+
+
+# Read data
+enrich_mas <- read.csv("./KEGGID_enrichfdr01_7cohort.csv",row.names = 1)
+enrich_mas=enrich_mas[enrich_mas$metadata %in% c("AF",
+                                                 "Non_PAF","PAF","IHD","CHF"),]
+
+enrich_mas$metadata=gsub("Non_PAF","Non-PAF",enrich_mas$metadata)
+enrich_mas$metadata=gsub("CHF","HF",enrich_mas$metadata)
+metakey=unique(enrich_mas$metadata)
+enrich_mas=na.omit(enrich_mas)
+passlist=unique(enrich_mas[,c("category","subcategory","Description","ID")])
+
+enrich=enrich_mas[enrich_mas$p.adjust<enrich_qvalue_thr,]
+metakey=unique(enrich$metadata)
+enrich=enrich[!is.na(enrich$Description),]
+enrich_mas_expose=enrich
+
+
+# B = KEGG subcategory (level B), C = pathway name (level C)
+colnames(enrich_mas_expose)[c(4,6)]=c("B","C")
+enrich_mas_expose$GeneRatio_val <- sapply(enrich_mas_expose$GeneRatio, function(x) {
+  parts <- unlist(strsplit(x, "/"))
+  as.numeric(parts[1]) / as.numeric(parts[2])
+})
+
+final=enrich_mas_expose
+tbl_plt <- final %>% 
+  mutate(`Enrichment%` = GeneRatio_val, .before = p.adjust) %>% 
+  mutate(Input_KOs = if_else(KO_list == "Enrich", "UP", "Down")) %>% 
+  arrange(B) %>% 
+  mutate(Input_KOs = factor(Input_KOs, levels = c("UP", "Down", "NO"))) %>% 
+  rename(Category = B) %>% 
+  filter(p.adjust < enrich_qvalue_thr) %>% 
+  mutate(Category = fct_relevel(Category, "Global and overview maps", after = 0)) %>%  # Move "Global and overview maps" to the top
+  arrange(Category) %>%  # Arrange after releveling to maintain the desired order
+  mutate(C = fct_inorder(C) %>% fct_rev(),
+         metadata = metadata)
+tbl_plt$metadata=factor(tbl_plt$metadata,levels =metakey )
+tbl_plt$new_enrich=ifelse(tbl_plt$`Enrichment%`>max_l,max_l,tbl_plt$`Enrichment%`)
+tbl_plt$`Enrichment%`=tbl_plt$new_enrich*times
+passlist=passlist[passlist$Description %in% tbl_plt$C,]
+
+brewerPlus <- distinct_palette()
+tbl_plt$new_enrich=ifelse(tbl_plt$`Enrichment%`>max_l,max_l,tbl_plt$`Enrichment%`)
+tbl_plt$`Enrichment%`=tbl_plt$new_enrich*times
+shared_size_scale <- scale_size(range = c(0, 5), limits = c(0, 0.05))
+color=c("firebrick", "dodgerblue","white")
+names(color)=c("UP","Down","NO")
+
+# Bubble plot
+plt_bubble <- tbl_plt %>%
+  ggplot(aes(x = metadata, y = C, size = `Enrichment%`, group = Input_KOs, color = Input_KOs)) +
+  geom_point(position = position_dodge(0.75), alpha = 0.6) +
+  shared_size_scale+
+  scale_color_manual(values = color) +
+  labs(title = str_c(paste0(length(unique(tbl_plt$C)),"pathC\n  MAA FDR<0.1 selected enrichment,\n enrich p.adjust<",enrich_qvalue_thr))) +
+  theme_bw(base_family = "Helvetica") +
+  theme(
+    strip.text = element_text(size = 10, face = "bold", angle = 90),  # 10 pt
+    axis.text = element_text(color = "black", size = 10, face = "bold"),  # 10 pt
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 10, face = "bold"),  # 10 pt
+    axis.text.y = element_blank(),
+    plot.title = element_text(size = 10),  # 10 pt
+    legend.text = element_text(size = 10),  # 10 pt
+    legend.title = element_text(size = 10),  # 10 pt
+    plot.margin = margin(0, 0, 0, 0, "pt"),
+    axis.line.x = element_line(size = 1.5, color = "black"),
+    axis.ticks.y = element_blank(),
+    axis.title = element_blank()
+  )+guides(fill = guide_legend(reverse = TRUE))
+
+# KEGG subcategory tiles (left, without labels)
+plt_B_out <- tbl_plt %>%
+  ggplot(aes(x="a", y=C, fill=Category))+
+  geom_tile(color="white")+
+  scale_fill_manual(values=brewerPlus)+
+  theme_minimal(base_family = "Helvetica") +scale_y_discrete(position = "right")+
+  theme(
+    axis.text.y = element_blank(),  # hide y-axis text
+    axis.text.x = element_blank(),  # hide x-axis text
+    legend.text = element_text(size = 10),  # 10 pt
+    legend.title = element_text(size = 10),  # 10 pt
+    plot.margin = margin(0, 0, 0, 0, "pt"),  # remove plot margins
+    axis.title = element_blank() )+guides(fill = guide_legend(reverse = F))
+
+
+# KEGG subcategory tiles with pathway names (right)
+plt_B <- tbl_plt %>%
+  ggplot(aes(x = "a", y = C, fill = Category)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = brewerPlus) +
+  theme_minimal(base_family = "Helvetica") +scale_y_discrete(position = "right")+
+  theme(
+    axis.text = element_text(color = "black", size = 10, face = "bold"),  # 10 pt
+    axis.text.x = element_blank(),  # hide x-axis text
+    axis.text.y.right = element_text(size = 10),  # 10 pt
+    axis.title.y.right = element_text(size = 10),  # 10 pt
+    legend.text = element_text(size = 10),  # 10 pt
+    legend.title = element_text(size = 10),  # 10 pt
+    plot.margin = margin(0, 0, 0, 0, "pt"),
+    axis.title = element_blank()
+  )+guides(fill = guide_legend(reverse = F))
+
+
+# Save as PDF
+cairo_pdf("250811_7cohort_FDR005_bubble_plot.pdf", height=12, width=9)
+wrap_plots(list(plt_B_out, plt_bubble,plt_B), nrow = 1, widths = c(1,12,1))+
+  plot_layout(guides = "collect")
+dev.off()
