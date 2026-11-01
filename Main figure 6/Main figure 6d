@@ -100,7 +100,13 @@ venn_plot <- venn.diagram(
 
   # Show all regions, including empty ones
   force.unique = TRUE,
-  print.mode = "raw"
+  print.mode = "raw",
+
+  # Always draw the standard three-circle Venn diagram.
+  # By default, VennDiagram switches to a special (Euler) layout when a region is 0
+  # (here, IHD & CHF only = 0), which rearranges the circles.
+  euler.d = FALSE,
+  scaled = FALSE
 )
 
 # Draw the Venn diagram
