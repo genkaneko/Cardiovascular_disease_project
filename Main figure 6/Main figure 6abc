@@ -1,0 +1,401 @@
+# Fig. 6a-c: diversity of the oral (saliva) microbiome (mOTUs v3, species level) in AF, IHD and CHF (HF)
+#   a: oral_alpha_shannon.pdf   (Shannon index)
+#   b: oral_alpha_richness.pdf  (Richness)
+#   c: oral_beta_diversity_7cohort_mds_plots.pdf
+#      (PCoA of Bray-Curtis distances; P values from PERMANOVA, adonis2)
+#   Alpha diversity: cases (1) vs non-cases (0), two-sided Wilcoxon rank-sum test.
+# Panel titles, axis labels and P-value formatting were edited after export
+# (e.g., "CHF" is shown as "HF", groups 0/1 as Control/Case).
+#
+# Input: oral_AF_meta_nonpaf_newHTN.csv (metadata), saliva.motus3.sp.relative_abundance.xlsx (relative abundance)
+# Other outputs: oral_alpha_diversity_6cohort.xlsx, oral_bc_distance.csv, oral_beta_diversity_results.rds,
+#   and PERMANOVA for 10 host covariates (oral_beta_diversity_10factor_results.rds, oral_beta_diversity_mds_plots.pdf)
+#
+# Required packages: vegan, openxlsx, ggplot2, reshape2, dplyr, patchwork
+
+library(vegan)
+library(openxlsx)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(patchwork)
+
+meta5137=as.data.frame(read.csv("oral_AF_meta_nonpaf_newHTN.csv",row.names = 1))
+rownames(meta5137)=meta5137$metas
+fdata=as.data.frame(t(read.xlsx("saliva.motus3.sp.relative_abundance.xlsx",rowNames = T,check.names = F,sep.names = " ")))
+fdata=fdata[,colSums(fdata)>0]
+diskey=c("AF",
+         "IHD",
+         "CHF"
+)
+modify_rownames <- function(df) {
+  old_names <- rownames(df)
+  new_names <- sapply(old_names, function(name) {
+    # As numeric
+    num_name <- suppressWarnings(as.numeric(name))
+    
+    # If the conversion succeeds (not NA)
+    if (!is.na(num_name)) {
+      return(as.character(num_name))  # Drops leading zeros
+    } else {
+      return(name)  # Keep the original string
+    }
+  })
+  
+  rownames(df) <- new_names
+  return(df)
+}
+# Align the sample order with the metadata and check it
+fdata=modify_rownames(fdata)
+pr=data.frame()
+
+set.seed(123)
+meta_data <- meta5137
+data=fdata[rownames(meta5137),]
+data=data[,colSums(data)>0]
+identical(rownames(data),rownames(meta5137))
+
+pr=NULL
+
+# Initialize objects
+alpha_list <- list()
+all_pvals <- data.frame()
+plot_lists_by_index <- list(
+  Shannon = list(),
+  Simpson = list(),
+  Pielou = list(),
+  Richness = list()
+)
+
+# Function to calculate alpha diversity indices
+calc_alpha_indices <- function(mat) {
+  shannon <- diversity((mat), index = "shannon")
+  simpson <- diversity((mat), index = "simpson")
+  richness <- rowSums(mat > 0)
+  pielou <- shannon / log(richness + 1e-10)
+  return(data.frame(
+    Shannon = shannon,
+    Simpson = simpson,
+    Pielou = pielou,
+    Richness = richness
+  ))
+}
+
+# Loop over each disease variable
+for (i in diskey) {
+  message("Processing: ", i)
+  
+  tempmeta <- meta5137
+  tempmeta=tempmeta[!is.na(tempmeta[,i]),]
+  common_ids <- intersect(rownames(tempmeta), rownames(data))
+  tempmeta <- tempmeta[common_ids, ]
+  tempdata <- data[common_ids, ]
+  
+  group_var <- tempmeta[[i]]
+  if (length(unique(group_var)) != 2) {
+    warning(paste("Variable", i, "does not have exactly 2 groups. Skipping."))
+    next
+  }
+  
+  # Calculate alpha diversity indices
+  alpha_indices <- calc_alpha_indices(tempdata)
+  alpha_indices$ID <- rownames(alpha_indices)
+  alpha_indices$Group <- factor(group_var)
+  # Keep the data for the Excel output (one sheet per disease)
+  alpha_list[[i]] <- alpha_indices
+  
+  # Convert to long format for plotting
+  long_alpha <- melt(alpha_indices,
+                     id.vars = c("ID", "Group"),
+                     variable.name = "Index",
+                     value.name = "Value")
+  
+  # Calculate P values for each index
+  pvals <- long_alpha %>%
+    group_by(Index) %>%
+    summarise(
+      P_value = wilcox.test(Value ~ Group)$p.value
+    ) %>%
+    mutate(Disease = i)
+  
+  all_pvals <- rbind(all_pvals, pvals)
+  
+  # Make one plot per alpha diversity index
+  for (index_name in unique(long_alpha$Index)) {
+    subdata <- long_alpha[long_alpha$Index == index_name, ]
+    
+    # Group as a factor with the order 0, 1
+    subdata$Group <- factor(subdata$Group, levels = c("0", "1"))
+    
+    # Colors
+    group_colors <- c("0" = "#00BFC4", "1" = "#F8766D")
+    
+    # P value for the current index
+    p_test <- wilcox.test(Value ~ Group, data = subdata)
+    p_value_label <- paste0("P = ", signif(p_test$p.value, 3))
+    
+    # Plot
+    p_single <- ggplot(subdata, aes(x = Group, y = Value, fill = Group)) +
+      geom_boxplot(width = 0.5, outlier.shape = NA) +
+      geom_jitter(aes(color = Group, alpha = Group),
+                  width = 0.2, size = 0.2, stroke = 0.1) +
+      scale_color_manual(values = c("0" = "grey50", "1" = "black")) +
+      scale_fill_manual(values = group_colors) +
+      scale_alpha_manual(values = c("0" = 0.2, "1" = 1)) +
+      annotate("text",
+               x = 1.5,
+               y = max(subdata$Value, na.rm = TRUE) * 1.05,
+               label = p_value_label,
+               size = 10 / .pt) +
+      labs(title = paste0(index_name, " - ", i),
+           x = NULL,
+           y = index_name) +
+      theme_minimal(base_size = 10) +
+      theme(
+        legend.position = "none",
+        plot.title = element_text(size = 10, face = "bold"),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 10)
+      )
+    plot_lists_by_index[[index_name]][[i]] <- p_single
+  }
+}
+
+# Write to Excel (one sheet per disease)
+write.xlsx(alpha_list, file = "oral_alpha_diversity_6cohort.xlsx")
+
+
+for (index_name in names(plot_lists_by_index)) {
+  plots <- plot_lists_by_index[[index_name]]
+  pdf_file <- paste0("oral_alpha_", tolower(index_name), ".pdf")
+  
+  # Combine the plots in one row
+  combined_plot <- wrap_plots(plots, nrow = 1)
+  
+  # Width depends on the number of plots
+  plot_width <- 1.6 * length(plots)
+  plot_height <- 1.8
+  
+  pdf(pdf_file, width = plot_width, height = plot_height)
+  print(combined_plot)
+  dev.off()
+}
+
+
+# ---- Beta diversity (AF / IHD / CHF) ----
+
+beta_results <- list()
+
+# Calculate Bray-Curtis distances once for all samples
+bc_dist <- vegdist(data, method = "bray")
+
+# Save as a matrix in CSV format (with sample names)
+bc_matrix <- as.matrix(bc_dist)
+write.csv(bc_matrix, "oral_bc_distance.csv", row.names = TRUE)
+
+# Read the saved Bray-Curtis distance matrix (as a matrix)
+bc_matrix_read <- read.csv("oral_bc_distance.csv", row.names = 1, check.names = FALSE)
+bc_matrix_read <- as.matrix(bc_matrix_read)
+
+# Loop over each variable
+for (i in diskey) {
+  message("Beta diversity - Processing: ", i)
+  set.seed(123)
+  
+  tempmeta <- meta5137
+  tempmeta <- tempmeta[!is.na(tempmeta[, i]), ]
+  
+  common_ids <- intersect(rownames(tempmeta), rownames(bc_matrix_read))
+  tempmeta <- tempmeta[common_ids, ]
+  
+  group_var <- tempmeta[[i]]
+  
+  # Skip variables that are not binary
+  if (length(unique(group_var)) != 2) {
+    warning(paste("Variable", i, "does not have exactly 2 groups. Skipping."))
+    next
+  }
+  
+  # Subset the distance matrix
+  bc_submatrix <- bc_matrix_read[common_ids, common_ids]
+  
+
+  bc_dist_sub <- as.dist(bc_submatrix)
+  
+  # PERMANOVA (adonis2)
+  adonis_res <- adonis2(bc_dist_sub ~ group_var, data = tempmeta, permutations = 999,parallel = 10)
+  p_value <- adonis_res$`Pr(>F)`[1]
+  set.seed(123)
+  # MDS (PCoA)
+  mds <- cmdscale(bc_dist_sub, k = 2, eig = TRUE)
+  mds_df <- as.data.frame(mds$points)
+  colnames(mds_df) <- c("MDS1", "MDS2")
+  mds_df$Group <- factor(group_var)
+  mds_df$SampleID <- rownames(mds_df)
+  
+  beta_results[[i]] <- list(
+    adonis = adonis_res,
+    p_value = p_value,
+    mds_df = mds_df
+  )
+}
+# Save the results for plotting
+saveRDS(beta_results, "oral_beta_diversity_results.rds")
+
+
+beta_results <- readRDS("oral_beta_diversity_results.rds")
+beta_plots <- list()
+
+for (i in names(beta_results)) {
+  mds_df <- beta_results[[i]]$mds_df
+  p_value <- beta_results[[i]]$p_value
+  p_label <- paste0("P = ", signif(p_value, 3))
+  p_mds <- ggplot(mds_df, aes(x = MDS1, y = MDS2)) +
+    # Group 0 points first (bottom layer)
+    geom_point(data = subset(mds_df, Group == "0"), 
+               aes(color = Group), 
+               alpha = 0.4, size = 0.01, stroke = 0.01) +
+    # Group 1 points on top
+    geom_point(data = subset(mds_df, Group == "1"), 
+               aes(color = Group), 
+               alpha = 0.8, size = 0.01, stroke = 0.01) +
+    # 95% ellipse for group 0
+    stat_ellipse(data = subset(mds_df, Group == "0"),
+                 aes(color = Group), 
+                 level = 0.95, type = "norm", linetype = 2, alpha = 0.4) +
+    # 95% ellipse for group 1
+    stat_ellipse(data = subset(mds_df, Group == "1"),
+                 aes(color = Group), 
+                 level = 0.95, type = "norm", linetype = 2, alpha = 0.8) +
+    scale_color_manual(values = c("0" = "royalblue", "1" = "tomato")) +
+    labs(
+      title = paste("Beta Diversity (", i, ")", sep = ""),
+      subtitle = p_label,
+      x = "MDS1", y = "MDS2"
+    ) +
+    theme_minimal(base_size = 10) +
+    theme(
+      plot.title = element_text(size = 10, face = "bold"),
+      plot.subtitle = element_text(size = 10),
+      axis.title = element_text(size = 10),
+      axis.text = element_text(size = 10),
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 10)
+    )
+  
+  beta_plots[[i]] <- p_mds
+}
+
+# Save as PDF
+cairo_pdf("oral_beta_diversity_7cohort_mds_plots.pdf", width = 2.3, height = 2.1)
+for (plot in beta_plots) {
+  print(plot)
+}
+dev.off()
+
+
+# ---- PERMANOVA for 10 host covariates ----
+beta_results <- list()
+checkkey=  c("Age",
+                  "sex",
+                  "BMI",
+                  "Proton.pump.inhibitors",
+                  "newHTN",
+                  "cur.ever.smoking",
+                  "Alcohol",
+                  "Antibiotics",
+                  "Diabetes.mellitus",
+                  "Dyslipidemia"
+                  
+                  
+)
+
+# Read the saved Bray-Curtis distance matrix (as a matrix)
+bc_matrix_read <- read.csv("oral_bc_distance.csv", row.names = 1, check.names = FALSE)
+bc_matrix_read <- as.matrix(bc_matrix_read)
+
+# Loop over each variable
+for (i in checkkey) {
+  message("Beta diversity - Processing: ", i)
+  set.seed(123)
+  
+  tempmeta <- meta5137
+  tempmeta <- tempmeta[!is.na(tempmeta[, i]), ]
+  
+  common_ids <- intersect(rownames(tempmeta), rownames(bc_matrix_read))
+  tempmeta <- tempmeta[common_ids, ]
+  
+  group_var <- tempmeta[[i]]
+  
+  # Skip variables that are not binary
+  if (length(unique(group_var)) != 2) {
+    warning(paste("Variable", i, "does not have exactly 2 groups. Skipping."))
+    next
+  }
+  
+  # Subset the distance matrix
+  bc_submatrix <- bc_matrix_read[common_ids, common_ids]
+  
+  
+  bc_dist_sub <- as.dist(bc_submatrix)
+  
+  # PERMANOVA (adonis2)
+  adonis_res <- adonis2(bc_dist_sub ~ group_var, data = tempmeta, permutations = 999,parallel = 10)
+  p_value <- adonis_res$`Pr(>F)`[1]
+  set.seed(123)
+  # MDS (PCoA)
+  mds <- cmdscale(bc_dist_sub, k = 2, eig = TRUE)
+  mds_df <- as.data.frame(mds$points)
+  colnames(mds_df) <- c("MDS1", "MDS2")
+  mds_df$Group <- factor(group_var)
+  mds_df$SampleID <- rownames(mds_df)
+  
+  beta_results[[i]] <- list(
+    adonis = adonis_res,
+    p_value = p_value,
+    mds_df = mds_df
+  )
+}
+# Save the results for plotting
+saveRDS(beta_results, "oral_beta_diversity_10factor_results.rds")
+
+
+beta_results <- readRDS("oral_beta_diversity_10factor_results.rds")
+beta_plots <- list()
+
+for (i in names(beta_results)) {
+  mds_df <- beta_results[[i]]$mds_df
+  p_value <- beta_results[[i]]$p_value
+  p_label <- paste0("Adonis P = ", signif(p_value, 3))
+  
+  p_mds <- ggplot(mds_df, aes(x = MDS1, y = MDS2, color = Group)) +
+    geom_point(size = 0.2, alpha = 0.5) +
+    stat_ellipse(level = 0.95, type = "norm", linetype = 2) +
+    scale_color_manual(values = c("0" = "royalblue", "1" = "tomato")) +
+    labs(
+      title = paste("Beta Diversity (", i, ")", sep = ""),
+      subtitle = p_label,
+      x = "MDS1", y = "MDS2"
+    ) +
+    theme_minimal(base_size = 10) +
+    theme(
+      plot.title = element_text(size = 10, face = "bold"),
+      plot.subtitle = element_text(size = 10),
+      axis.title = element_text(size = 10),
+      axis.text = element_text(size = 10),
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 10)
+    )
+  
+  beta_plots[[i]] <- p_mds
+}
+
+# Save as PDF
+cairo_pdf("oral_beta_diversity_mds_plots.pdf", width = 3, height = 3)
+for (plot in beta_plots) {
+  print(plot)
+}
+dev.off()
+
