@@ -1,7 +1,7 @@
 # Fig. 5b: KEGG pathway enrichment of disease-associated KOs (bubble plot).
 #   KOs associated with each disease (MaAsLin2, cate = "5137", FDR < 0.1) were tested for KEGG pathway enrichment
 #   separately for positively (KO_list = "Enrich" -> UP, red) and negatively associated KOs (Down, blue).
-#   Pathways with adjusted P (p.adjust) < 0.1 are shown for AF, Non-PAF, PAF, IHD and HF.
+#   Pathways with adjusted P (p.adjust) < 0.1 are shown for AF, IHD and HF.
 #   Bubble size = gene ratio (capped at 5%). Tiles on the left and right show the KEGG subcategory (level B);
 #   pathway names (level C) are shown on the right.
 # Input: KEGGID_enrichfdr01_7cohort.csv (pathway enrichment results)
@@ -22,9 +22,8 @@ times=1
 # Read data
 enrich_mas <- read.csv("./KEGGID_enrichfdr01_7cohort.csv",row.names = 1)
 enrich_mas=enrich_mas[enrich_mas$metadata %in% c("AF",
-                                                 "Non_PAF","PAF","IHD","CHF"),]
+                                                 "IHD","CHF"),]
 
-enrich_mas$metadata=gsub("Non_PAF","Non-PAF",enrich_mas$metadata)
 enrich_mas$metadata=gsub("CHF","HF",enrich_mas$metadata)
 metakey=unique(enrich_mas$metadata)
 enrich_mas=na.omit(enrich_mas)
