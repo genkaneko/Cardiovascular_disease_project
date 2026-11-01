@@ -411,7 +411,7 @@ for (tgt in all_targets) {
 # ============================================================
 
 pdf(
-  "cytokine_boxplot_AF_IHD_CHF_centered_by_median.pdf",
+  "cytokine_boxplot_AF_IHD_CHF.pdf",
   width = 1.75,
   height = 2
 )
