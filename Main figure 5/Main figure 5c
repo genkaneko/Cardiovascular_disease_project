@@ -1,0 +1,322 @@
+# Fig. 5c: heatmap of log2 fold changes in selected metabolites for AF, IHD and HF vs the reference group
+#   (participants with HC2 = 1, n = 568). log2FC = log2(mean in disease group / mean in HC2).
+#   P values: two-sided Wilcoxon rank-sum test vs HC2; BH-FDR is calculated within each disease
+#   across the selected metabolites. * P < 0.05, ** FDR < 0.1.
+#   AF / IHD / HF are independent flags (a participant can belong to more than one group).
+#   Zero values are replaced with half of the smallest positive value of each metabolite.
+#   Metabolites listed in metabolite_to_remove.xlsx are excluded before the analysis.
+# Input: 1713MetabLifestylePapers.xlsx (metabolite data with AF / IHD / HF / HC2 flags), metabolite_to_remove.xlsx
+# Output: metabolites_log2FC_vs_HC2_ComplexHeatmap.pdf, metabolites_log2FC_vs_HC2_statistics.csv,
+#         metabolites_hm.csv (input subset), metabolites_group_sample_counts.csv
+# Required packages: tidyverse, readxl, ComplexHeatmap, circlize, gridtext. Minor edits were made after export.
+
+library(tidyverse)
+library(readxl)
+library(ComplexHeatmap)
+library(circlize)
+library(grid)
+library(gridtext)
+
+# ---- Input files -----------------------------------------------------------
+metabolites <- readxl::read_excel(
+  "1713MetabLifestylePapers.xlsx",
+  sheet = 1,
+  col_names = TRUE,
+  col_types = NULL,
+  na = "",
+  skip = 0
+)
+
+remove_list <- readxl::read_excel(
+  "metabolite_to_remove.xlsx",
+  sheet = 1,
+  col_names = TRUE,
+  col_types = NULL,
+  na = "",
+  skip = 0
+)
+
+# ---- Remove metabolites ---------------------------------------------------
+# The list has 26 rows, but Vanillylamine and Isovalerylglycine are duplicated: 24 metabolites after unique().
+metabolites_to_remove <- remove_list$Metabolite |>
+  as.character() |>
+  trimws() |>
+  na.omit() |>
+  unique()
+
+metabolites_filtered <- metabolites[, 
+                                    !names(metabolites) %in% metabolites_to_remove,
+                                    drop = FALSE
+]
+
+# Columns actually removed
+removed_columns <- intersect(names(metabolites), metabolites_to_remove)
+print(removed_columns)
+
+# Names in the removal list that are not in the input data
+not_found_columns <- setdiff(metabolites_to_remove, names(metabolites))
+print(not_found_columns)
+
+# ---- User settings ---------------------------------------------------------
+flag_cols <- c("AF", "IHD", "HF", "HC2")
+comparison_groups <- c("AF", "IHD", "HF")
+
+selected_metabolites <- c(
+  "3-Dehydroshikimic acid",
+  "Pyridoxal",
+  "Niacinamide",
+  "Orotic acid",
+  "Ureidopropionic acid",
+  "Histamine",
+  "Urocanic acid",
+  "Hypotaurine",
+  "2-Aminoadipic acid",
+  "Glucose 6-phosphate"
+)
+
+out_csv_hm <- "metabolites_hm.csv"
+out_pdf <- "metabolites_log2FC_vs_HC2_ComplexHeatmap.pdf"
+out_statistics <- "metabolites_log2FC_vs_HC2_statistics.csv"
+out_group_counts <- "metabolites_group_sample_counts.csv"
+
+stopifnot(all(flag_cols %in% names(metabolites_filtered)))
+stopifnot(all(selected_metabolites %in% names(metabolites_filtered)))
+
+# ---- Export the heatmap input subset --------------------------------------
+metabolites_hm <- metabolites_filtered %>%
+  dplyr::select(all_of(flag_cols), all_of(selected_metabolites))
+
+write.csv(metabolites_hm, out_csv_hm, row.names = FALSE)
+
+# ---- QC: count every independent flag -------------------------------------
+# AF / IHD / HF are treated as independent flags, not mutually exclusive groups.
+# e.g., a sample with IHD = 1 and HF = 1 is included in both the IHD and HF groups.
+group_n <- metabolites_hm %>%
+  summarise(across(all_of(flag_cols), ~ sum(.x == 1, na.rm = TRUE))) %>%
+  pivot_longer(everything(), names_to = "Group", values_to = "n_samples")
+
+print(group_n)
+readr::write_csv(group_n, out_group_counts)
+
+# Check the number of HC2 samples (expected: 568)
+hc2_n <- group_n %>% filter(Group == "HC2") %>% pull(n_samples)
+message("Number of HC2 samples: ", hc2_n)
+
+# ---- Long-format data ------------------------------------------------------
+# Each sample is included in every group whose flag is 1.
+long <- metabolites_hm %>%
+  pivot_longer(
+    cols = all_of(flag_cols),
+    names_to = "Group",
+    values_to = "in_group"
+  ) %>%
+  filter(in_group == 1) %>%
+  select(-in_group) %>%
+  pivot_longer(
+    cols = all_of(selected_metabolites),
+    names_to = "Metabolite",
+    values_to = "Abundance"
+  ) %>%
+  filter(is.finite(Abundance), Abundance >= 0) %>%
+  mutate(
+    Group = factor(Group, levels = c(comparison_groups, "HC2")),
+    Metabolite = factor(Metabolite, levels = selected_metabolites)
+  )
+
+# ---- Replace zero values ---------------------------------------------------
+# For each metabolite, replace zeros with half of the smallest positive value across all samples.
+# The same replacement value is used for the disease groups and HC2.
+min_positive_tbl <- metabolites_hm %>%
+  select(all_of(selected_metabolites)) %>%
+  pivot_longer(everything(), names_to = "Metabolite", values_to = "Abundance") %>%
+  filter(is.finite(Abundance), Abundance > 0) %>%
+  group_by(Metabolite) %>%
+  summarise(min_positive = min(Abundance), .groups = "drop")
+
+long <- long %>%
+  left_join(min_positive_tbl, by = "Metabolite") %>%
+  mutate(
+    Abundance = if_else(
+      Abundance == 0 & !is.na(min_positive),
+      min_positive / 2,
+      Abundance
+    ),
+    Abundance = if_else(is.na(min_positive), NA_real_, Abundance)
+  ) %>%
+  select(-min_positive)
+
+# ---- Calculate log2FC, Wilcoxon p-value, and BH-FDR -----------------------
+result_list <- vector("list", length(selected_metabolites) * length(comparison_groups))
+k <- 1L
+
+for (met in selected_metabolites) {
+  hc2_vals <- long %>%
+    filter(as.character(Metabolite) == met, as.character(Group) == "HC2") %>%
+    pull(Abundance)
+  hc2_vals <- hc2_vals[is.finite(hc2_vals)]
+  
+  for (grp in comparison_groups) {
+    grp_vals <- long %>%
+      filter(as.character(Metabolite) == met, as.character(Group) == grp) %>%
+      pull(Abundance)
+    grp_vals <- grp_vals[is.finite(grp_vals)]
+    
+    p_value <- if (length(grp_vals) >= 2 && length(hc2_vals) >= 2) {
+      suppressWarnings(wilcox.test(grp_vals, hc2_vals, exact = FALSE)$p.value)
+    } else {
+      NA_real_
+    }
+    
+    group_mean <- if (length(grp_vals) > 0) mean(grp_vals) else NA_real_
+    hc2_mean <- if (length(hc2_vals) > 0) mean(hc2_vals) else NA_real_
+    
+    log2FC <- if (
+      is.finite(group_mean) && is.finite(hc2_mean) &&
+      group_mean > 0 && hc2_mean > 0
+    ) {
+      log2(group_mean / hc2_mean)
+    } else {
+      NA_real_
+    }
+    
+    result_list[[k]] <- tibble(
+      Metabolite = met,
+      Comparison = grp,
+      group_mean = group_mean,
+      hc2_mean = hc2_mean,
+      n_group = length(grp_vals),
+      n_HC2 = length(hc2_vals),
+      log2FC = log2FC,
+      p_value = p_value
+    )
+    k <- k + 1L
+  }
+}
+
+# BH-FDR is calculated separately for AF / IHD / HF, across all selected metabolites.
+# Significance labels: ** if FDR < 0.1; otherwise * if P < 0.05.
+fc_tbl <- bind_rows(result_list) %>%
+  group_by(Comparison) %>%
+  mutate(FDR = p.adjust(p_value, method = "BH")) %>%
+  ungroup() %>%
+  mutate(
+    Metabolite = factor(Metabolite, levels = selected_metabolites),
+    Comparison = factor(Comparison, levels = comparison_groups),
+    signif = case_when(
+      !is.na(FDR) & FDR < 0.1 ~ "**",
+      !is.na(p_value) & p_value < 0.05 ~ "*",
+      TRUE ~ ""
+    )
+  )
+
+# ---- Build matrices --------------------------------------------------------
+hm_mat <- fc_tbl %>%
+  select(Metabolite, Comparison, log2FC) %>%
+  pivot_wider(names_from = Comparison, values_from = log2FC) %>%
+  arrange(Metabolite) %>%
+  column_to_rownames("Metabolite") %>%
+  as.matrix()
+
+# Keep the short metabolite names as row names (used internally)
+rownames(hm_mat) <- selected_metabolites
+
+# Row labels for display only:
+# line 1 = metabolite (8 pt), line 2 = pathway (7 pt)
+row_labels <- c(
+  "3-Dehydroshikimic acid<br><span style='font-size:7.0pt'>(Phe/Tyr/Trp biosynthesis)</span>",
+  "Pyridoxal<br><span style='font-size:7.0pt'>(Vitamin B6 metabolism)</span>",
+  "Niacinamide<br><span style='font-size:7.0pt'>(Nicotinate/nicotinamide metabolism)</span>",
+  "Orotic acid<br><span style='font-size:7.0pt'>(Pyrimidine metabolism)</span>",
+  "Ureidopropionic acid<br><span style='font-size:7.0pt'>(Pyrimidine/beta-alanine metabolism)</span>",
+  "Histamine<br><span style='font-size:7.0pt'>(Histidine metabolism)</span>",
+  "Urocanic acid<br><span style='font-size:7.0pt'>(Histidine metabolism)</span>",
+  "Hypotaurine<br><span style='font-size:7.0pt'>(Taurine/hypotaurine metabolism)</span>",
+  "2-Aminoadipic acid<br><span style='font-size:7.0pt'>(Amino-acid/lysine metabolism)</span>",
+  "Glucose 6-phosphate<br><span style='font-size:7.0pt'>(Carbohydrate/carbon metabolism)</span>"
+)
+
+star_mat <- fc_tbl %>%
+  select(Metabolite, Comparison, signif) %>%
+  pivot_wider(names_from = Comparison, values_from = signif) %>%
+  arrange(Metabolite) %>%
+  column_to_rownames("Metabolite") %>%
+  as.matrix()
+
+# Symmetric color scale centred on zero
+lim <- max(abs(hm_mat), na.rm = TRUE)
+# Narrow the white band around zero:
+# red / blue become clearly visible when |log2FC| exceeds 10% of the maximum
+near_zero <- lim * 0.10
+
+if (!is.finite(lim) || lim == 0) lim <- 1
+col_fun <- colorRamp2(
+  c(-lim, -near_zero, 0, near_zero, lim),
+  c("#2166AC", "#7FB3D5", "#FFFFFF", "#E9967A", "#B2182B")
+)
+
+
+# ---- Draw heatmap ----------------------------------------------------------
+ht <- Heatmap(
+  hm_mat,
+  name = "log2FC\nvs HC2",
+  col = col_fun,
+  na_col = "grey90",
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  
+  row_names_side = "left",
+  row_labels = gt_render(row_labels),
+  row_names_gp = gpar(fontsize = 8),
+  row_names_max_width = unit(62, "mm"),
+  
+  column_names_gp = gpar(fontsize = 8, fontface = "bold"),
+  rect_gp = gpar(col = "white", lwd = 1),
+  
+  cell_fun = function(j, i, x, y, width, height, fill) {
+    label <- star_mat[i, j]
+    if (!is.na(label) && label != "") {
+      grid.text(
+        label,
+        x,
+        y,
+        gp = gpar(fontsize = 8, fontface = "bold", col = "black")
+      )
+    }
+  },
+  
+  heatmap_legend_param = list(
+    title = "log2FC",
+    at = c(-lim, 0, lim),
+    labels = sprintf("%.2f", c(-lim, 0, lim))
+  )
+)
+pdf(
+  out_pdf,
+  width =  4.0,
+  height = max(3, 0.25 * nrow(hm_mat) + 1.0),
+  useDingbats = FALSE
+)
+draw(
+  ht,
+  heatmap_legend_side = "right",
+  annotation_legend_side = "right",
+  padding = unit(c(5, 25, 5, 5), "mm")
+)
+
+grid.text(
+  "* P < 0.05\n** FDR < 0.1",
+  x = unit(1, "npc") - unit(3, "mm"),
+  y = unit(20, "mm"),
+  just = c("right", "bottom"),
+  gp = gpar(fontsize = 8)
+)
+dev.off()
+
+# ---- Save results ----------------------------------------------------------
+# Write P values, FDR, significance labels, and the number of samples, means and log2FC for each group
+readr::write_csv(fc_tbl, out_statistics)
+
+message("Wrote: ", out_csv_hm)
+message("Wrote: ", out_pdf)
+message("Wrote: ", out_statistics)
+message("Wrote: ", out_group_counts)
