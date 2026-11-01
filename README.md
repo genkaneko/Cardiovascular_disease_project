@@ -71,7 +71,7 @@ The repository provides the analysis code used to generate the quantitative resu
 Complete reproduction of analyses is not possible from the public repository alone because these data cannot be publicly released under applicable ethical approvals and privacy regulations. Access to individual-level metadata is subject to the data-sharing procedures described in the Data availability section.
 
 Data availability
-The human metagenomic sequencing data from the Japanese 4D cohort (n = 6,803) have been deposited in the NCBI Sequence Read Archive (SRA) under accession numbers PRJNA1169537 (n = 654)31, PRJNA832909 (n = 136)28, PRJNA1445561 (n = 4,343), and PRJNA1552338 (n = 4). The human oral shotgun metagenomic sequencing data (n = 889) have been deposited under accession number PRJNA832909 (n = 265)28, and PRJNA1552353 (n = 624), and will be publicly available upon publication.
+The human metagenomic sequencing data from the Japanese cohort (n = 6,803) have been deposited in the NCBI Sequence Read Archive (SRA) under accession numbers PRJNA1169537 (n = 654)31, PRJNA832909 (n = 136)28, PRJNA1445561 (n = 4,343), and PRJNA1552338 (n = 4). The human oral shotgun metagenomic sequencing data (n = 889) have been deposited under accession number PRJNA832909 (n = 265)28, and PRJNA1552353 (n = 624), and will be publicly available upon publication.
 Metagenomic data from the external validation cohorts are publicly available from the respective original studies and can be accessed via the corresponding publications and associated repositories.
 
 License
