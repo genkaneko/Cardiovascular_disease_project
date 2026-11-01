@@ -1,0 +1,198 @@
+# Cohen's kappa between gut (fecal) and oral (saliva) samples; creates the input for Fig7.R.
+#   For each species found in both gut and oral data, presence/absence (relative abundance > 0) in the gut and
+#   oral samples of the same participants is compared with Cohen's kappa (irr::kappa2), separately in participants
+#   with AF, IHD and CHF (HF). Mean abundance and prevalence in each sample type are also calculated.
+#   Gut MaAsLin2 results (cate = "5137"; coef, pval, qval) for each disease are added (columns *_f_*).
+#   Species without gut MaAsLin2 results, or absent from the oral samples of all three groups, are excluded;
+#   BH-FDR (kappa_fdr_*) is then calculated for each disease.
+# Input: oral_AF_meta_nonpaf_newHTN.csv (metadata; column `metas` = saliva sample ID),
+#        saliva.motus3.sp.relative_abundance.xlsx (oral), NewSpeciesMOTU3_5999.xlsx (gut),
+#        Species.csv (old and new species names), 7cohort_motusp_MAA.csv (from MaAsLin2_gut.R)
+# Output: Cohens_Kappa_AF_IHD_CHF.csv (input for Fig7.R)
+# Required packages: openxlsx, tidyverse, irr
+
+library(openxlsx)
+library(tidyverse)
+library(irr)  # For calculating Cohen's Kappa
+
+# Read metadata and abundance data; align gut and oral samples of the same participants with the metadata
+meta <- as.data.frame(read.csv("oral_AF_meta_nonpaf_newHTN.csv", row.names = 1))
+sdata <- as.data.frame(t(read.xlsx("saliva.motus3.sp.relative_abundance.xlsx", rowNames = TRUE, check.names = FALSE, sep.names = " ")))
+sdata <- sdata[meta$metas, ]
+sdata <- sdata[, colSums(sdata) > 0]
+fdata <- as.data.frame(read.xlsx("NewSpeciesMOTU3_5999.xlsx", rowNames = TRUE, check.names = FALSE, sep.names = " "))
+fdata <- fdata[rownames(meta), ]
+fdata <- fdata[, colSums(fdata) > 0]
+
+# Use the mOTU ID as the column name (extracted from "[ID:...]" in the species name)
+colnames(fdata) <- ifelse(
+  str_detect(colnames(fdata), "\\[ID:[^\\]]+\\]"),
+  str_extract(colnames(fdata), "(?<=\\[ID:)[^\\]]+"),
+  colnames(fdata)
+)
+
+colnames(sdata) <- ifelse(
+  str_detect(colnames(sdata), "\\[ID:[^\\]]+\\]"),
+  str_extract(colnames(sdata), "(?<=\\[ID:)[^\\]]+"),
+  colnames(sdata)
+)
+
+# Keep species found in both gut and oral data
+fdata <- fdata[, colnames(fdata) %in% colnames(sdata)]
+sdata <- sdata[, colnames(sdata) %in% colnames(fdata)]
+
+# Save original abundance data (for calculating mean and prevalence)
+fdata_original <- fdata
+sdata_original <- sdata
+
+# Convert abundance data to binary 0/1 data (presence/absence)
+fdata_binary <- fdata
+sdata_binary <- sdata
+
+# Set values greater than 0 to 1, and 0 and NA values to 0
+fdata_binary[fdata_binary > 0] <- 1
+sdata_binary[sdata_binary > 0] <- 1
+
+# Read the table of old and new species names
+oldtonew <- as.data.frame(read.csv("Species.csv"))
+oldtonew <- oldtonew[!is.na(oldtonew$old), ]  # Remove rows with NA values
+
+# Use the mOTU ID of the old species name as the row name
+
+rownames(oldtonew) <- ifelse(
+  str_detect(oldtonew$old, "\\[ID:[^\\]]+\\]"),
+  str_extract(oldtonew$old, "(?<=\\[ID:)[^\\]]+"),
+  oldtonew$old
+)
+
+# Perform Cohen's Kappa agreement analysis
+kappa_results <- data.frame()
+
+for (i in colnames(fdata_binary)) {
+  # Get binary data for the current species (for Kappa calculation)
+  x_binary <- fdata_binary[, i]
+  y_binary <- sdata_binary[, i]
+  
+  # Get original abundance data for the current species (for calculating mean and prevalence)
+  x_original <- fdata_original[, i]
+  y_original <- sdata_original[, i]
+  
+  # AF == 1 subgroup
+  af_meta <- meta$AF == 1
+  x_af_binary <- x_binary[af_meta]
+  y_af_binary <- y_binary[af_meta]
+  x_af_original <- x_original[af_meta]
+  y_af_original <- y_original[af_meta]
+  kappa_result_af <- kappa2(data.frame(x_af_binary, y_af_binary))
+  
+  # IHD == 1 subgroup
+  ihd_meta <- meta$IHD == 1
+  x_ihd_binary <- x_binary[ihd_meta]
+  y_ihd_binary <- y_binary[ihd_meta]
+  x_ihd_original <- x_original[ihd_meta]
+  y_ihd_original <- y_original[ihd_meta]
+  kappa_result_ihd <- kappa2(data.frame(x_ihd_binary, y_ihd_binary))
+  
+  # CHF == 1 subgroup
+  chf_meta <- meta$CHF == 1
+  x_chf_binary <- x_binary[chf_meta]
+  y_chf_binary <- y_binary[chf_meta]
+  x_chf_original <- x_original[chf_meta]
+  y_chf_original <- y_original[chf_meta]
+  kappa_result_chf <- kappa2(data.frame(x_chf_binary, y_chf_binary))
+  
+  # Calculate mean and prevalence for each subgroup using original abundance data
+  # AF == 1
+  mean_f_af <- mean(x_af_original)  # Calculate mean using original abundance data
+  mean_s_af <- mean(y_af_original)
+  prev_f_af <- mean(x_af_original > 0)  # Prevalence: proportion of values greater than 0
+  prev_s_af <- mean(y_af_original > 0)
+  n_af <- length(x_af_original)  # Sample size
+  
+  # IHD == 1
+  mean_f_ihd <- mean(x_ihd_original)  # Calculate mean using original abundance data
+  mean_s_ihd <- mean(y_ihd_original)
+  prev_f_ihd <- mean(x_ihd_original > 0)  # Prevalence: proportion of values greater than 0
+  prev_s_ihd <- mean(y_ihd_original > 0)
+  n_ihd <- length(x_ihd_original)
+  
+  # CHF == 1
+  mean_f_chf <- mean(x_chf_original)  # Calculate mean using original abundance data
+  mean_s_chf <- mean(y_chf_original)
+  prev_f_chf <- mean(x_chf_original > 0)  # Prevalence: proportion of values greater than 0
+  prev_s_chf <- mean(y_chf_original > 0)
+  n_chf <- length(x_chf_original)
+  
+  # Save results
+  kappa_results <- rbind(kappa_results, data.frame(
+    old = ifelse(i %in% rownames(oldtonew), oldtonew[i, "old"], i),  # Use the old species name if available; otherwise use i
+    new = ifelse(i %in% rownames(oldtonew), oldtonew[i, "new"], i),  # Use the new species name if available; otherwise use i
+    
+    # Mean and prevalence for each subgroup (calculated using original abundance data)
+    # Cohen's kappa, P value, FDR (calculated below) and sample size are included for each subgroup
+    mean_f_af = mean_f_af,
+    mean_s_af = mean_s_af,
+    prev_f_af = prev_f_af,
+    prev_s_af = prev_s_af,
+    kappa_value_af = kappa_result_af$value,
+    kappa_pval_af = kappa_result_af$p.value,
+    kappa_fdr_af = NA,
+    n_af = n_af,
+    
+    
+    mean_f_ihd = mean_f_ihd,
+    mean_s_ihd = mean_s_ihd,
+    prev_f_ihd = prev_f_ihd,
+    prev_s_ihd = prev_s_ihd,
+    kappa_value_ihd = kappa_result_ihd$value,
+    kappa_pval_ihd = kappa_result_ihd$p.value,
+    kappa_fdr_ihd = NA,
+    n_ihd = n_ihd,
+    
+    
+    
+    mean_f_chf = mean_f_chf,
+    mean_s_chf = mean_s_chf,
+    prev_f_chf = prev_f_chf,
+    prev_s_chf = prev_s_chf,
+    kappa_value_chf = kappa_result_chf$value,
+    kappa_pval_chf = kappa_result_chf$p.value,
+    kappa_fdr_chf = NA,
+    n_chf = n_chf
+  ))
+}
+
+# Add the gut MaAsLin2 results (cate = "5137") for AF / IHD / CHF, matched by the new species name
+fecalmaa=as.data.frame(read.csv("7cohort_motusp_MAA.csv"))
+fecalmaa=fecalmaa[fecalmaa$metadata %in% c("AF","IHD","CHF"),]
+
+fecalmaa=fecalmaa[fecalmaa$cate=="5137",]
+fecalmaa$key=paste0(fecalmaa$metadata,fecalmaa$feature)
+rownames(fecalmaa)=fecalmaa$key
+kappa_results$AF_f_coef=fecalmaa[paste0("AF",kappa_results$new),]$coef
+kappa_results$AF_f_pval=fecalmaa[paste0("AF",kappa_results$new),]$pval
+kappa_results$AF_f_qval=fecalmaa[paste0("AF",kappa_results$new),]$qval
+
+
+kappa_results$IHD_f_coef=fecalmaa[paste0("IHD",kappa_results$new),]$coef
+kappa_results$IHD_f_pval=fecalmaa[paste0("IHD",kappa_results$new),]$pval
+kappa_results$IHD_f_qval=fecalmaa[paste0("IHD",kappa_results$new),]$qval
+
+kappa_results$CHF_f_coef=fecalmaa[paste0("CHF",kappa_results$new),]$coef
+kappa_results$CHF_f_pval=fecalmaa[paste0("CHF",kappa_results$new),]$pval
+kappa_results$CHF_f_qval=fecalmaa[paste0("CHF",kappa_results$new),]$qval
+
+# Keep species with gut MaAsLin2 results that are present in the oral samples of at least one group
+kappa_results=kappa_results[(!is.na(kappa_results$AF_f_coef)),]
+kappa_results=kappa_results[(kappa_results$mean_s_af!=0)|(kappa_results$mean_s_ihd!=0)|(kappa_results$mean_s_chf!=0),]
+# Adjust P values (BH-FDR) for each disease
+kappa_results$kappa_fdr_af <- p.adjust(kappa_results$kappa_pval_af, method = "fdr")
+kappa_results$kappa_fdr_ihd <- p.adjust(kappa_results$kappa_pval_ihd, method = "fdr")
+kappa_results$kappa_fdr_chf <- p.adjust(kappa_results$kappa_pval_chf, method = "fdr")
+
+
+# Save Cohen's Kappa results
+write.csv(kappa_results, "Cohens_Kappa_AF_IHD_CHF.csv",row.names = F)
+
+# Output Cohen's Kappa results
+print(kappa_results)
