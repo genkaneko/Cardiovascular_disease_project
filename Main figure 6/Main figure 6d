@@ -1,0 +1,117 @@
+# Fig. 6d
+#   Venn diagram of oral (saliva) species (mOTUs) associated with AF, IHD and CHF (HF)
+#   (MaAsLin2 results, comparison "5137", P < 0.05).
+#   Output: oral_motusp_venn_diagram_AF_IHD_CHF.pdf
+#
+# Input: oral_7cohort_motusp_MAA.csv (MaAsLin2 results for oral species; column `cate` = comparison)
+#
+# Required packages: dplyr, VennDiagram
+# Minor edits were made after export (e.g., "CHF" is shown as "HF").
+
+library(dplyr)
+library(VennDiagram)
+
+# Read data
+data <- read.csv("oral_7cohort_motusp_MAA.csv", stringsAsFactors = FALSE)
+
+# Inspect the data structure
+print("Data structure:")
+print(str(data))
+print("Column names:")
+print(colnames(data))
+
+# Filtering criteria:
+# 1. metadata is AF, IHD or CHF
+# 2. cate is "5137" and pval < 0.05
+filtered_data <- data %>%
+  filter(metadata %in% c("AF", "IHD", "CHF")) %>%
+  filter(cate %in% c("5137")) %>%
+  filter(pval < 0.05)
+
+print(paste("Rows after filtering:", nrow(filtered_data)))
+
+# Number of rows per disease
+print("Rows per disease:")
+print(table(filtered_data$metadata))
+
+# Extract the list of features for each disease
+af_features <- filtered_data %>%
+  filter(metadata == "AF") %>%
+  pull(feature) %>%
+  unique()
+
+ihd_features <- filtered_data %>%
+  filter(metadata == "IHD") %>%
+  pull(feature) %>%
+  unique()
+
+chf_features <- filtered_data %>%
+  filter(metadata == "CHF") %>%
+  pull(feature) %>%
+  unique()
+
+print(paste("Number of AF features:", length(af_features)))
+print(paste("Number of IHD features:", length(ihd_features)))
+print(paste("Number of CHF features:", length(chf_features)))
+
+# Overlaps between diseases
+print(paste("AF & IHD:", length(intersect(af_features, ihd_features))))
+print(paste("AF & CHF:", length(intersect(af_features, chf_features))))
+print(paste("IHD & CHF:", length(intersect(ihd_features, chf_features))))
+print(paste("AF & IHD & CHF:", length(Reduce(intersect, list(af_features, ihd_features, chf_features)))))
+
+# Create the Venn diagram
+venn_plot <- venn.diagram(
+  x = list(
+    AF = af_features,
+    IHD = ihd_features,
+    CHF = chf_features
+  ),
+  category.names = c("AF", "IHD", "CHF"),
+  filename = NULL,  # return a grob object instead of writing a file
+
+  # Colors
+  fill = c("#FF6B6B", "#4ECDC4", "#45B7D1"),
+  alpha = 0.7,
+
+  # Borders
+  lwd = 2,
+  lty = 'solid',
+  col = c("#FF6B6B", "#4ECDC4", "#45B7D1"),
+
+  # Text
+  cex = 0.8,
+  fontfamily = "sans",
+  fontface = "bold",
+
+  # Category labels
+  cat.cex = 0.8,
+  cat.fontface = "bold",
+  cat.default.pos = "outer",
+  cat.pos = c(-27, 27, 135),
+  cat.dist = c(0.055, 0.055, 0.085),
+  cat.fontfamily = "sans",
+
+  # Count labels
+  label.col = "black",
+
+  # Margin
+  margin = 0.1,
+
+  # Show all regions, including empty ones
+  force.unique = TRUE,
+  print.mode = "raw"
+)
+
+# Draw the Venn diagram
+grid.newpage()
+grid.draw(venn_plot)
+
+# Save as PDF
+pdf("oral_motusp_venn_diagram_AF_IHD_CHF.pdf", width = 8, height = 6)
+grid.newpage()
+grid.text("Oral Motusp Features (pval < 0.05)",
+          x = 0.5, y = 0.95,
+          gp = gpar(fontsize = 12, fontface = "bold"))
+grid.draw(venn_plot)
+dev.off()
