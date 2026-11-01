@@ -1,0 +1,317 @@
+# Fig. 4a: direction of change in plasma cytokines (TNF-alpha, IL-8/CXCL8, CCL2, CXCL9, IP-10/CXCL10, CXCL11)
+#   in participants with vs without AF, IHD and CHF (HF). For each disease x cytokine, the log2 fold change of means
+#   (disease = 1 vs 0) and a two-sided Wilcoxon rank-sum P value are calculated (no covariate adjustment).
+#   Cells are coloured by direction when P <= 0.05 (pink = increase, light blue = decrease); otherwise white (ns).
+#   Zero values are replaced with half of the smallest non-zero value of each cytokine before the calculation.
+# Input: 5137_AF_meta_nonpaf_newHTN.csv (metadata; disease columns coded 0/1), Cytokine_ForPaper.xlsx
+# Output: cytokine_disease_direction_heatmap.pdf, cytokine_disease_log2FC_summary.csv/.xlsx (summary table)
+# Required packages: openxlsx, dplyr, ComplexHeatmap. Minor edits were made after export.
+
+library(openxlsx)
+library(dplyr)
+library(grid)
+library(ComplexHeatmap)
+
+par(family = "Helvetica")
+
+# ============================================================
+# 1. Load data
+# ============================================================
+
+metadata <- as.data.frame(
+  read.csv("../5137_AF_meta_nonpaf_newHTN.csv", row.names = 1)
+)
+
+cytokine <- as.data.frame(read.xlsx(
+  "Cytokine_ForPaper.xlsx",
+  rowNames = TRUE,
+  check.names = FALSE,
+  sep.names = " ",
+  sheet = 1
+))
+
+rownames(cytokine) <- cytokine$METAF
+rownames(cytokine) <- sapply(rownames(cytokine), function(x) {
+  v <- suppressWarnings(as.numeric(x))
+  if (!is.na(v)) as.character(v) else x
+})
+
+cytokine <- cytokine[, -c(1:3)]
+
+metabo <- as.data.frame(read.xlsx(
+  "1713MetabLifestyle.xlsx",
+  check.names = FALSE,
+  sep.names = " "
+))
+
+rownames(metabo) <- metabo$METAF
+rownames(metabo) <- sapply(rownames(metabo), function(x) {
+  v <- suppressWarnings(as.numeric(x))
+  if (!is.na(v)) as.character(v) else x
+})
+
+metabo <- metabo[, c(-1, -2, -3)]
+
+# ============================================================
+# 2. Target variables
+# ============================================================
+
+target_cytokines <- c(
+  "TNF_alpha",
+  "IL8_CXCL8",
+  "CCL2",
+  "CXCL9",
+  "IP10_CXCL10",
+  "CXCL11"
+)
+
+all_targets <- target_cytokines
+disease_list <- c("AF", "IHD", "CHF")
+
+# ============================================================
+# 3. Colors and sizes
+# ============================================================
+
+COLOR_DECREASE <- "#90CAD0"  # light blue
+COLOR_INCREASE <- "#FAB1AD"  # pink
+COLOR_NS       <- "white"
+
+fs <- 5
+cell_size <- unit(2.5, "mm")
+
+# ============================================================
+# 4. Calculate mean log2FC, P value and n for each disease x cytokine
+# ============================================================
+
+calc_cytokine_summary <- function(data_df, metadata_df, targets, disease_list) {
+  
+  res_list <- list()
+  
+  common_ids <- intersect(rownames(data_df), rownames(metadata_df))
+  
+  data_df <- data_df[common_ids, , drop = FALSE]
+  metadata_df <- metadata_df[common_ids, , drop = FALSE]
+  
+  for (dis in disease_list) {
+    
+    if (!(dis %in% colnames(metadata_df))) {
+      stop(paste0("Column not found in metadata: ", dis))
+    }
+    
+    disease_vec <- metadata_df[, dis]
+    disease_vec <- as.numeric(as.character(disease_vec))
+    
+    for (tgt in targets) {
+      
+      if (!(tgt %in% colnames(data_df))) {
+        next
+      }
+      
+      vals <- data_df[, tgt]
+      vals <- suppressWarnings(as.numeric(vals))
+      
+      min_nz <- suppressWarnings(min(vals[vals > 0], na.rm = TRUE))
+      
+      if (!is.finite(min_nz)) {
+        res_list[[paste(dis, tgt, sep = "_")]] <- data.frame(
+          Disease = dis,
+          Cytokine = tgt,
+          n_total = 0,
+          n_disease1 = 0,
+          n_disease0 = 0,
+          mean_disease0 = NA,
+          mean_disease1 = NA,
+          median_disease0 = NA,
+          median_disease1 = NA,
+          log2FC_mean_1_vs_0 = NA,
+          p_value = NA,
+          heatmap_group = "ns"
+        )
+        next
+      }
+      
+      vals[vals == 0] <- min_nz / 2
+      
+      df <- data.frame(
+        value = vals,
+        disease_status = disease_vec
+      ) %>%
+        filter(
+          !is.na(value),
+          !is.na(disease_status),
+          value > 0,
+          disease_status %in% c(0, 1)
+        )
+      
+      df0 <- df$value[df$disease_status == 0]
+      df1 <- df$value[df$disease_status == 1]
+      
+      n_total <- nrow(df)
+      n_disease1 <- length(df1)
+      n_disease0 <- length(df0)
+      
+      mean0 <- mean(df0, na.rm = TRUE)
+      mean1 <- mean(df1, na.rm = TRUE)
+      
+      med0 <- median(df0, na.rm = TRUE)
+      med1 <- median(df1, na.rm = TRUE)
+      
+      log2fc_mean <- ifelse(
+        is.na(mean0) | is.na(mean1) | mean0 <= 0 | mean1 <= 0,
+        NA,
+        log2(mean1 / mean0)
+      )
+      
+      p_val <- tryCatch(
+        {
+          if (length(unique(df$disease_status)) < 2) {
+            NA
+          } else {
+            wilcox.test(
+              df$value[df$disease_status == 0],
+              df$value[df$disease_status == 1]
+            )$p.value
+          }
+        },
+        error = function(e) NA
+      )
+      
+      heatmap_group <- ifelse(
+        is.na(p_val) | p_val > 0.05 | is.na(log2fc_mean),
+        "ns",
+        ifelse(log2fc_mean > 0, "increase", "decrease")
+      )
+      
+      res_list[[paste(dis, tgt, sep = "_")]] <- data.frame(
+        Disease = dis,
+        Cytokine = tgt,
+        n_total = n_total,
+        n_disease1 = n_disease1,
+        n_disease0 = n_disease0,
+        mean_disease0 = mean0,
+        mean_disease1 = mean1,
+        median_disease0 = med0,
+        median_disease1 = med1,
+        log2FC_mean_1_vs_0 = log2fc_mean,
+        p_value = p_val,
+        heatmap_group = heatmap_group
+      )
+    }
+  }
+  
+  do.call(rbind, res_list)
+}
+
+summary_cytokine <- calc_cytokine_summary(
+  data_df = cytokine,
+  metadata_df = metadata,
+  targets = target_cytokines,
+  disease_list = disease_list
+)
+
+# Check the number of significant increases / decreases
+print(table(summary_cytokine$heatmap_group, useNA = "ifany"))
+
+# ============================================================
+# 5. Write the summary table
+# ============================================================
+
+write.csv(
+  summary_cytokine,
+  "cytokine_disease_log2FC_summary.csv",
+  row.names = FALSE
+)
+
+write.xlsx(
+  summary_cytokine,
+  "cytokine_disease_log2FC_summary.xlsx",
+  rowNames = FALSE
+)
+
+# ============================================================
+# 6. Build the heatmap matrix
+#    Note: keep it as a character matrix (do not convert to factor)
+# ============================================================
+
+mat <- matrix(
+  "ns",
+  nrow = length(disease_list),
+  ncol = length(target_cytokines)
+)
+
+rownames(mat) <- disease_list
+colnames(mat) <- target_cytokines
+
+for (i in seq_len(nrow(summary_cytokine))) {
+  
+  dis <- summary_cytokine$Disease[i]
+  tgt <- summary_cytokine$Cytokine[i]
+  
+  mat[dis, tgt] <- as.character(summary_cytokine$heatmap_group[i])
+}
+
+mat <- as.matrix(mat)
+
+# Check the categories in the heatmap matrix
+print(mat)
+print(table(as.vector(mat), useNA = "ifany"))
+
+# ============================================================
+# 7. Heatmap colors
+# ============================================================
+
+col_fun <- c(
+  "decrease" = COLOR_DECREASE,
+  "increase" = COLOR_INCREASE,
+  "ns"       = COLOR_NS
+)
+
+# ============================================================
+# 8. Draw the heatmap
+#    Each cell = 2.5 mm
+#    font = Helvetica, 5 pt
+# ============================================================
+
+ht <- Heatmap(
+  mat,
+  name = "Direction",
+  col = col_fun,
+  na_col = "white",
+  
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  
+  show_row_names = TRUE,
+  show_column_names = TRUE,
+  
+  row_names_gp = gpar(fontsize = fs, fontfamily = "Helvetica"),
+  column_names_gp = gpar(fontsize = fs, fontfamily = "Helvetica"),
+  
+  width = cell_size * ncol(mat),
+  height = cell_size * nrow(mat),
+  
+  rect_gp = gpar(col = "black", lwd = 0.3),
+  
+  heatmap_legend_param = list(
+    title_gp = gpar(fontsize = fs, fontfamily = "Helvetica"),
+    labels_gp = gpar(fontsize = fs, fontfamily = "Helvetica"),
+    grid_width = unit(2.5, "mm"),
+    grid_height = unit(2.5, "mm"),
+    at = c("increase", "decrease", "ns"),
+    labels = c("increase", "decrease", "ns")
+  )
+)
+
+pdf(
+  "cytokine_disease_direction_heatmap.pdf",
+  width = 2,
+  height = 1.3,
+  family = "Helvetica"
+)
+
+draw(
+  ht,
+  heatmap_legend_side = "right"
+)
+
+dev.off()
