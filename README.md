@@ -25,7 +25,7 @@ MaAsLin2_gut.R
 MaAsLin2_oral.R
 
 Input files
-Because individual-level metadata from the Japanese 4D cohort cannot be publicly released owing to ethical and privacy restrictions, these input files are not included in the public repository where they contain restricted participant-level information. Typical input files include:
+Because individual-level metadata from the Japanese cohort cannot be publicly released owing to ethical and privacy restrictions, these input files are not included in the public repository where they contain restricted participant-level information. Typical input files include:
 7cohort_genus_MAA.csv: MaAsLin2 results at the genus level
 7cohort_motusp_MAA.csv: MaAsLin2 results at the species level
 metadata.csv: Participant metadata, including age, sex, BMI, lifestyle factors, medications, and disease status
